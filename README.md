@@ -1,7 +1,15 @@
-# Grupo IsaMig — Site institucional
+# IsaMig — Site Institucional V6
 
-Site estático para GitHub Pages. Página inicial em `/` e portfólio em `/portfolio/`.
+Inclui página inicial, portfólio e página **Nossa História** (`/historia/`).
 
-A integração com GitHub consulta dados públicos, sem credenciais. Horas trabalhadas não são inferidas de commits.
+## Publicação
+Envie o conteúdo desta pasta para a raiz do repositório `washingtonOF.github.io` (preserve seus demais arquivos). Não altere o DNS.
 
-Publique os arquivos na raiz do repositório `washingtonOF/washingtonOF.github.io`, preservando qualquer pasta existente.
+## Animações
+Animações fortes: gradiente do título, painel flutuante, órbitas giratórias, etiquetas em movimento, cartões animados, revelação na rolagem, efeitos de brilho e elementos da página História. Usuários com configuração de movimento reduzido recebem experiência sem animações.
+
+## Contato
+contato@grupoisamig.com.br · WhatsApp (85) 98581-8985. Verifique se a caixa postal está ativa antes de publicar.
+
+## Observação
+Os 15+ anos são atribuídos à trajetória profissional do fundador, não à idade da empresa. Empresas citadas são experiências profissionais, não clientes/parceiros.
