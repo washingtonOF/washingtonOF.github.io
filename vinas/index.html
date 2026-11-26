@@ -85,6 +85,25 @@ async function residentPreview(container,unit,role='master'){
  panel.dataset.tabbed='true';
  }
  const body=panel.dataset.tabbed==='true'?panel.children[3]:panel;
+ if(role==='master'){
+ const access=document.createElement('section');access.style.cssText='margin-top:16px;padding:12px;border:1px solid #dbe5ef;border-radius:10px';panel.append(access);
+ const heading=document.createElement('strong');heading.textContent='Perfil de acesso';access.append(heading);
+ const message=document.createElement('p');message.textContent='Consultando contas autorizadas…';access.append(message);
+ const uid=auth.currentUser?.uid, version=generation;
+ if(unit==='204'){message.textContent='Master — perfil exclusivo da conta principal.';}
+ else getDocsFromServer(collection(db,'users')).then(snap=>{
+ if(!access.isConnected||uid!==auth.currentUser?.uid||version!==generation)return;
+ const accounts=snap.docs.filter(d=>d.data().unit===unit&&d.data().status==='approved');
+ if(!accounts.length){message.textContent='Nenhuma conta autorizada nesta unidade. Autorize o usuário no menu Usuários antes de associar o perfil.';return;}
+ message.textContent='Selecione o perfil da conta autorizada. Apenas o Master pode alterar permissões.';
+ for(const account of accounts){const row=document.createElement('div');row.style.cssText='display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:8px';const label=document.createElement('span');label.textContent=account.data().email||'Conta autorizada';row.append(label);
+ const select=document.createElement('select');select.setAttribute('aria-label','Perfil de acesso');for(const [value,title] of [['resident','Condômino'],['administrative','ADM']]){const option=document.createElement('option');option.value=value;option.textContent=title;option.disabled=value==='administrative'&&!['101','201'].includes(unit);select.append(option)}select.value=account.data().role;row.append(select);
+ const save=document.createElement('button');save.className='action';save.textContent='Associar perfil';row.append(save);access.append(row);
+ save.onclick=async()=>{if(!access.isConnected||uid!==auth.currentUser?.uid||version!==generation)return;if(!confirm('Alterar o perfil desta conta no AP '+unit+'?'))return;save.disabled=true;try{const fresh=await getDocFromServer(account.ref);if(!access.isConnected||uid!==auth.currentUser?.uid||version!==generation)return;if(fresh.data()?.unit!==unit||fresh.data()?.status!=='approved')throw Error('Conta alterada');if(select.value!=='resident'&&!(select.value==='administrative'&&['101','201'].includes(unit)))throw Error('Perfil inválido');await updateDoc(account.ref,{role:select.value});message.textContent='Perfil atualizado.';}catch(e){message.textContent='Não foi possível atualizar o perfil. Confira as permissões.';}finally{save.disabled=false}};
+ }
+ }).catch(()=>{message.textContent='Não foi possível consultar as contas autorizadas.';});
+ }
+
  const notice=document.createElement('p');notice.className='notice';notice.textContent='Consultando cadastro protegido…';body.append(notice);
  const ref=doc(db,'residents',unit);const actor=auth.currentUser;const epoch=generation;
  try{
