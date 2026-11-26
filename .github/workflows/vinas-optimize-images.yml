@@ -1,0 +1,41 @@
+name: Optimize Vinnas images
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - .github/workflows/vinas-optimize-images.yml
+permissions:
+  contents: write
+jobs:
+  optimize:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: python -m pip install Pillow
+      - run: |
+          curl --fail --location --retry 3 'https://raw.githubusercontent.com/washingtonOF/isamig-finance/main/%C3%8Dcone%20do%20Condom%C3%ADnio%20Vinnas%20Del%20Mar%206100.png' -o /tmp/vinnas.png
+          python - <<'PY'
+          from PIL import Image
+          from pathlib import Path
+          for source,target,size in [('/tmp/vinnas.png','vinas/vinnas-logo.webp', (640,640)),('assets/isamig-logo.png','vinas/isamig-logo.webp',(240,240)),('/tmp/vinnas.png','vinas/favicon.png',(64,64))]:
+              with Image.open(source) as im:
+                  im=im.convert('RGBA')
+                  im.thumbnail(size,Image.Resampling.LANCZOS)
+                  im.save(target,quality=85,method=6) if target.endswith('.webp') else im.save(target,optimize=True)
+              print(target,Path(source).stat().st_size,Path(target).stat().st_size)
+          PY
+      - run: |
+          python - <<'PY'
+          from pathlib import Path
+          p=Path('vinas/index.html')
+          s=p.read_text()
+          url='https://raw.githubusercontent.com/washingtonOF/isamig-finance/main/%C3%8Dcone%20do%20Condom%C3%ADnio%20Vinnas%20Del%20Mar%206100.png'
+          s=s.replace('rel="icon" href="'+url+'"','rel="icon" href="favicon.png"')
+          s=s.replace('src="'+url+'"','src="vinnas-logo.webp" decoding="async" fetchpriority="high"')
+          s=s.replace('src="/assets/isamig-logo.png"','src="isamig-logo.webp" decoding="async"')
+          p.write_text(s)
+          PY
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add vinas/index.html vinas/vinnas-logo.webp vinas/isamig-logo.webp vinas/favicon.png
+          if ! git diff --cached --quiet; then git commit -m 'Serve optimized local portal images'; git push; fi
