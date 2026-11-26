@@ -191,7 +191,7 @@ function showFinance(data,user){
  select(menus[0]);document.querySelector(".shell").hidden=true;el("financePanel").hidden=false;
 }
 onAuthStateChanged(auth,async user=>{
- const current=++generation;hideFinance();if(unsubscribe){unsubscribe();unsubscribe=null;}
+ const current=++generation;document.getElementById("registrationClaimPanel")?.remove();hideFinance();if(unsubscribe){unsubscribe();unsubscribe=null;}
  el("masterPanel").hidden=true;masterTab("overview");for(const s of ["pending","approved","revoked"])el(s+"Count").textContent="—";el("userList").replaceChildren();document.querySelector(".shell").hidden=false;
  el("loginControls").hidden=!!user;el("logout").hidden=!user;
  if(!user){mode(false);return;}
@@ -205,7 +205,17 @@ onAuthStateChanged(auth,async user=>{
  const ref=doc(db,"users",user.uid);const existing=await getDoc(ref);if(current!==generation)return;
  if(!existing.exists()){try{await setDoc(ref,{email:token.claims.email,name:user.displayName||"",role:"user",status:"pending"});}catch(e){if(!(await getDoc(ref)).exists())throw e;}}
  if(current!==generation)return;
- unsubscribe=onSnapshot(ref,{includeMetadataChanges:true},snapshot=>{if(current!==generation)return;const data=snapshot.data()||{},state=data.status;const valid=units.includes(data.unit)&&(data.role==="resident"||(data.role==="administrative"&&["101","201"].includes(data.unit)));if(state==="approved"&&valid&&!snapshot.metadata.fromCache){showFinance(data,user);return;}hideFinance();document.querySelector(".shell").hidden=false;status(state==="revoked"?"Seu acesso foi revogado.":state==="approved"&&valid?"Validando autorização com o servidor…":"Cadastro aguardando aprovação ou vinculação ao apartamento.");},()=>{if(current===generation){hideFinance();document.querySelector(".shell").hidden=false;status("Não foi possível consultar suas permissões.");}});
+ const claimPanel=document.createElement("section");claimPanel.id="registrationClaimPanel";claimPanel.hidden=true;
+ document.getElementById("registrationClaimPanel")?.remove();
+ const form=document.createElement("form");const label=document.createElement("label");label.textContent="CPF para identificação cadastral";
+ const cpf=document.createElement("input");cpf.inputMode="numeric";cpf.autocomplete="off";cpf.required=true;cpf.maxLength=14;label.append(cpf);
+ const submit=document.createElement("button");submit.type="submit";submit.textContent="Enviar solicitação";
+ const message=document.createElement("p");message.setAttribute("aria-live","polite");
+ form.append(label,submit);claimPanel.append(form,message);el("status").after(claimPanel);
+ const claimRef=doc(db,"registration_claims",user.uid);
+ async function loadClaim(){try{const s=await getDocFromServer(claimRef);if(current!==generation||!claimPanel.isConnected)return;if(s.exists()){form.hidden=true;message.textContent="Solicitação recebida. Aguarde a análise do Master.";}else{form.hidden=false;message.textContent="Informe seu CPF. A identidade será verificada antes da liberação."}}catch(e){if(current===generation){form.hidden=true;message.textContent="Cadastro por CPF ainda indisponível.";}}}
+ form.onsubmit=async e=>{e.preventDefault();if(current!==generation||auth.currentUser?.uid!==user.uid)return;const digits=cpf.value.replace(/[^0-9]/g,"");if(digits.length!==11){message.textContent="Informe os 11 dígitos do CPF.";return;}submit.disabled=true;try{await setDoc(claimRef,{cpf:digits,createdAt:serverTimestamp()});cpf.value="";await loadClaim();}catch(e){if(current===generation)message.textContent="Não foi possível enviar. Consulte o Master ou tente novamente.";}finally{submit.disabled=false;}};
+ unsubscribe=onSnapshot(ref,{includeMetadataChanges:true},snapshot=>{if(current!==generation)return;const data=snapshot.data()||{},state=data.status;const valid=data.unit!=="204"&&units.includes(data.unit)&&(data.role==="resident"||(data.role==="administrative"&&["101","201"].includes(data.unit)));claimPanel.hidden=state!=="pending";if(state==="pending"&&!snapshot.metadata.fromCache&&!claimPanel.dataset.loaded){claimPanel.dataset.loaded="1";loadClaim();}if(state==="approved"&&valid&&!snapshot.metadata.fromCache){showFinance(data,user);return;}hideFinance();document.querySelector(".shell").hidden=false;status(state==="revoked"?"Seu acesso foi revogado.":state==="approved"&&valid?"Validando autorização com o servidor…":"Cadastro aguardando aprovação ou vinculação ao apartamento.");},()=>{if(current===generation){hideFinance();document.querySelector(".shell").hidden=false;status("Não foi possível consultar suas permissões.");}});
  }catch(e){if(current===generation)status("Não foi possível verificar o cadastro. ("+(e.code||"erro")+")");}
 });
 </script></body></html>
