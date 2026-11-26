@@ -139,6 +139,15 @@ function showUsers(snapshot){
     const row=document.createElement("p");row.style.cssText="padding:12px;border-bottom:1px solid #dbe5ef";
     const label={matched:"CPF correspondente — verificar identidade",review:"Revisão manual necessária",invalid:"CPF inválido",not_found:"Cadastro não localizado"}[result.status]||"Resultado desconhecido";
     row.textContent=[account.email||"Conta não localizada",result.masked_name||"",result.unit?"AP "+result.unit:"",label].filter(Boolean).join(" · ");reviewRows.append(row);
+    const claim=await getDocFromServer(doc(db,"registration_claims",record.id));
+    const resident=result.status==="matched"&&units.includes(result.unit)&&result.unit!=="204"?await getDocFromServer(doc(db,"residents",result.unit)):null;
+    if(!review.isConnected||actor!==auth.currentUser?.uid||epoch!==generation)return;
+    const proposed=claim.data()||{},previous=resident?.data()||{};
+    const comparison=document.createElement("div");
+    for(const [label,before,after] of [["Telefone",previous.phone,proposed.phone],["E-mail",previous.email,proposed.email],["WhatsApp",undefined,typeof proposed.whatsapp==="boolean"?(proposed.whatsapp?"Sim":"Não"):undefined]]){
+     const line=document.createElement("p");line.textContent=label+": "+(before||"Não informado")+" → "+(after||"Não informado");comparison.append(line);
+    }
+    row.append(comparison);
     const decisionRef=doc(db,"registration_decisions",record.id);
     const decision=await getDocFromServer(decisionRef);
     if(!review.isConnected||actor!==auth.currentUser?.uid||epoch!==generation)return;
