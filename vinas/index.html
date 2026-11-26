@@ -76,6 +76,7 @@ async function residentPreview(container,unit,role='master'){
  const old=container.querySelector('.resident-preview');if(old)old.remove();
  const panel=document.createElement('section');panel.className='resident-preview finance-content';panel.style.marginTop='18px';container.append(panel);
  const h=document.createElement('h3');h.textContent='Ficha cadastral — AP '+unit;panel.append(h);
+ if(role!=='resident'){const financialStatus=document.createElement('p');financialStatus.className='notice';financialStatus.textContent='⚪ Situação financeira: não verificada — histórico por unidade ainda não consolidado.';panel.append(financialStatus);}
  if(role!=='resident'){
  const tabs=document.createElement('div');tabs.className='tabs';const a=document.createElement('button'),b=document.createElement('button');a.textContent='Dados cadastrais';b.textContent='Vínculo Cora';a.setAttribute('aria-selected','true');b.setAttribute('aria-selected','false');tabs.append(a,b);panel.append(tabs);
  const details=document.createElement('div'),link=document.createElement('div');link.hidden=true;panel.append(details,link);
@@ -83,7 +84,7 @@ async function residentPreview(container,unit,role='master'){
  b.onclick=()=>{details.hidden=true;link.hidden=false;link.replaceChildren();a.setAttribute('aria-selected','false');b.setAttribute('aria-selected','true');unitCoraLink(link,unit,()=>residentPreview(container,unit,role))};
  panel.dataset.tabbed='true';
  }
- const body=panel.dataset.tabbed==='true'?panel.children[2]:panel;
+ const body=panel.dataset.tabbed==='true'?panel.children[3]:panel;
  const notice=document.createElement('p');notice.className='notice';notice.textContent='Consultando cadastro protegido…';body.append(notice);
  const ref=doc(db,'residents',unit);const actor=auth.currentUser;const epoch=generation;
  try{
