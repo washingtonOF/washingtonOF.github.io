@@ -123,6 +123,26 @@ function showUsers(snapshot){
  const search=document.createElement("input");search.placeholder="Pesquisar nome, e-mail ou apartamento";search.value=previous;search.setAttribute("aria-label","Pesquisar usuários");search.style.cssText="padding:10px;border:1px solid #cbd9e7;border-radius:8px;width:min(100%,360px);margin:8px 8px 8px 0";list.append(search);
  const filter=document.createElement("select");filter.setAttribute("aria-label","Situação do acesso");for(const [v,t] of [["all","Todos"],["pending","Pendentes"],["approved","Autorizados"],["revoked","Revogados"]]){const o=document.createElement("option");o.value=v;o.textContent=t;filter.append(o)}filter.value=previousFilter;list.append(filter);
  const results=document.createElement("div");list.append(results);
+ const review=document.createElement("section");review.style.marginTop="18px";list.append(review);
+ const reviewTitle=document.createElement("h3");reviewTitle.textContent="Solicitações de cadastro";review.append(reviewTitle);
+ const reviewButton=document.createElement("button");reviewButton.type="button";reviewButton.textContent="Consultar solicitações";review.append(reviewButton);
+ const reviewRows=document.createElement("div");review.append(reviewRows);
+ reviewButton.onclick=async()=>{
+  const actor=auth.currentUser?.uid,epoch=generation;reviewButton.disabled=true;reviewRows.textContent="Consultando solicitações...";
+  try{
+   const records=await getDocsFromServer(collection(db,"registration_review_private"));
+   if(!review.isConnected||actor!==auth.currentUser?.uid||epoch!==generation)return;
+   reviewRows.replaceChildren();
+   if(records.empty){reviewRows.textContent="Nenhuma solicitação processada.";return;}
+   for(const record of records.docs){
+    const result=record.data().result||{},account=snapshot.docs.find(d=>d.id===record.id)?.data()||{};
+    const row=document.createElement("p");row.style.cssText="padding:12px;border-bottom:1px solid #dbe5ef";
+    const label={matched:"CPF correspondente — verificar identidade",review:"Revisão manual necessária",invalid:"CPF inválido",not_found:"Cadastro não localizado"}[result.status]||"Resultado desconhecido";
+    row.textContent=[account.email||"Conta não localizada",result.masked_name||"",result.unit?"AP "+result.unit:"",label].filter(Boolean).join(" · ");reviewRows.append(row);
+   }
+  }catch(e){if(review.isConnected&&actor===auth.currentUser?.uid&&epoch===generation)reviewRows.textContent="Consulta indisponível. A integração cadastral ainda pode estar pendente.";}
+  finally{reviewButton.disabled=false;}
+ };
  const registry=document.createElement("section");registry.style.marginTop="18px";list.append(registry);
  const registryTitle=document.createElement("h3");registryTitle.textContent="Acessos por apartamento";registry.append(registryTitle);
  const roleFilter=document.createElement("select");roleFilter.setAttribute("aria-label","Filtrar perfil por apartamento");roleFilter.style.cssText="padding:10px;border:1px solid #cbd9e7;border-radius:8px;margin:8px 0";for(const [v,t] of [["all","Todos os perfis"],["master","Master"],["administrative","ADM"],["resident","Condômino"]]){const o=document.createElement("option");o.value=v;o.textContent=t;roleFilter.append(o)}registry.append(roleFilter);
