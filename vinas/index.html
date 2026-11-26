@@ -85,25 +85,6 @@ async function residentPreview(container,unit,role='master'){
  panel.dataset.tabbed='true';
  }
  const body=panel.dataset.tabbed==='true'?panel.children[3]:panel;
- if(role==='master'){
- const access=document.createElement('section');access.style.cssText='margin-top:16px;padding:12px;border:1px solid #dbe5ef;border-radius:10px';panel.append(access);
- const heading=document.createElement('strong');heading.textContent='Perfil de acesso';access.append(heading);
- const message=document.createElement('p');message.textContent='Consultando contas autorizadas…';access.append(message);
- const uid=auth.currentUser?.uid, version=generation;
- if(unit==='204'){message.textContent='Master — perfil exclusivo da conta principal.';}
- else getDocsFromServer(collection(db,'users')).then(snap=>{
- if(!access.isConnected||uid!==auth.currentUser?.uid||version!==generation)return;
- const accounts=snap.docs.filter(d=>d.data().unit===unit&&d.data().status==='approved');
- if(!accounts.length){message.textContent='Nenhuma conta autorizada nesta unidade. Autorize o usuário no menu Usuários antes de associar o perfil.';return;}
- message.textContent='Selecione o perfil da conta autorizada. Apenas o Master pode alterar permissões.';
- for(const account of accounts){const row=document.createElement('div');row.style.cssText='display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:8px';const label=document.createElement('span');label.textContent=account.data().email||'Conta autorizada';row.append(label);
- const select=document.createElement('select');select.setAttribute('aria-label','Perfil de acesso');for(const [value,title] of [['resident','Condômino'],['administrative','ADM']]){const option=document.createElement('option');option.value=value;option.textContent=title;option.disabled=value==='administrative'&&!['101','201'].includes(unit);select.append(option)}select.value=account.data().role;row.append(select);
- const save=document.createElement('button');save.className='action';save.textContent='Associar perfil';row.append(save);access.append(row);
- save.onclick=async()=>{if(!access.isConnected||uid!==auth.currentUser?.uid||version!==generation)return;if(!confirm('Alterar o perfil desta conta no AP '+unit+'?'))return;save.disabled=true;try{const fresh=await getDocFromServer(account.ref);if(!access.isConnected||uid!==auth.currentUser?.uid||version!==generation)return;if(fresh.data()?.unit!==unit||fresh.data()?.status!=='approved')throw Error('Conta alterada');if(select.value!=='resident'&&!(select.value==='administrative'&&['101','201'].includes(unit)))throw Error('Perfil inválido');await updateDoc(account.ref,{role:select.value});message.textContent='Perfil atualizado.';}catch(e){message.textContent='Não foi possível atualizar o perfil. Confira as permissões.';}finally{save.disabled=false}};
- }
- }).catch(()=>{message.textContent='Não foi possível consultar as contas autorizadas.';});
- }
-
  const notice=document.createElement('p');notice.className='notice';notice.textContent='Consultando cadastro protegido…';body.append(notice);
  const ref=doc(db,'residents',unit);const actor=auth.currentUser;const epoch=generation;
  try{
@@ -136,21 +117,27 @@ function masterTab(tab,selectedUnit){
 document.querySelectorAll("[data-master]").forEach(b=>b.onclick=()=>masterTab(b.dataset.master));
 function showUsers(snapshot){
  const counts={pending:0,approved:0,revoked:0};snapshot.forEach(item=>{const s=item.data().status;if(Object.hasOwn(counts,s))counts[s]++});for(const s of Object.keys(counts))el(s+"Count").textContent=counts[s];
- const list=el("userList");list.replaceChildren();
- if(snapshot.empty){list.textContent="Nenhum cadastro pendente ou autorizado.";return;}
- snapshot.forEach(item=>{
- const data=item.data(), row=document.createElement("div");
- row.style.cssText="display:flex;flex-wrap:wrap;gap:12px;align-items:center;padding:14px 0;border-bottom:1px solid #dbe5ef";
- const label=document.createElement("span");label.style.flex="1";label.textContent=(data.email||item.id)+" — "+({pending:"Pendente",approved:"Autorizado",revoked:"Revogado"}[data.status]||"Desconhecido");row.append(label);
- const unitSelect=document.createElement("select");unitSelect.setAttribute("aria-label","Apartamento do usuário");unitSelect.style.cssText="padding:10px;border:1px solid #cbd9e7;border-radius:8px;font:inherit";
- for(const u of ["",...units]){const opt=document.createElement("option");opt.value=u;opt.textContent=u?"AP "+u:"Selecionar AP";unitSelect.append(opt)}unitSelect.value=units.includes(data.unit)?data.unit:"";row.append(unitSelect);
- const admin=document.createElement("input");admin.type="checkbox";admin.checked=data.role==="administrative";const adminLabel=document.createElement("label");adminLabel.append(admin," Administrativo");row.append(adminLabel);
- const sync=()=>{admin.disabled=!["101","201"].includes(unitSelect.value);if(admin.disabled)admin.checked=false;};unitSelect.onchange=sync;sync();
- for(const [value,title] of [["approved","Autorizar"],["revoked","Revogar"]]){
- const b=document.createElement("button");b.className="action";b.style.width="auto";b.textContent=title;b.disabled=value==="revoked"&&data.status===value;
- b.onclick=async()=>{if(value==="approved"&&!units.includes(unitSelect.value)){el("adminStatus").textContent="Selecione o apartamento antes de autorizar.";return;}if(!confirm(title+" este usuário? Confirme previamente sua identidade e vínculo com o condomínio."))return;b.disabled=true;try{await updateDoc(item.ref,value==="approved"?{status:value,unit:unitSelect.value,role:admin.checked&&["101","201"].includes(unitSelect.value)?"administrative":"resident"}:{status:value});el("adminStatus").textContent="Permissão atualizada."}catch(e){el("adminStatus").textContent="Falha ao atualizar a permissão.";b.disabled=false;}};row.append(b);}
- list.append(row);
- });
+ const list=el("userList");const previous=list.querySelector('input')?.value||"";const previousFilter=list.querySelector('select')?.value||"all";list.replaceChildren();
+ const h=document.createElement("h2");h.textContent="Gestão de usuários e acessos";list.append(h);
+ const note=document.createElement("p");note.textContent="Autorize contas verificadas, associe apartamentos e gerencie perfis. AP 204 é exclusivo do Master; ADM somente AP 101 e 201.";list.append(note);
+ const search=document.createElement("input");search.placeholder="Pesquisar nome, e-mail ou apartamento";search.value=previous;search.setAttribute("aria-label","Pesquisar usuários");list.append(search);
+ const filter=document.createElement("select");filter.setAttribute("aria-label","Situação do acesso");for(const [v,t] of [["all","Todos"],["pending","Pendentes"],["approved","Autorizados"],["revoked","Revogados"]]){const o=document.createElement("option");o.value=v;o.textContent=t;filter.append(o)}filter.value=previousFilter;list.append(filter);
+ const results=document.createElement("div");list.append(results);
+ const actor=auth.currentUser?.uid,epoch=generation;
+ function draw(){results.replaceChildren();const q=search.value.trim().toLowerCase();let found=0;
+ for(const item of snapshot.docs){const data=item.data();if(filter.value!=="all"&&data.status!==filter.value)continue;if(q&&![data.name,data.email,data.unit].some(v=>String(v||"").toLowerCase().includes(q)))continue;found++;
+ const row=document.createElement("section");row.style.cssText="padding:16px 0;border-bottom:1px solid #dbe5ef";
+ const label=document.createElement("strong");label.textContent=data.name||data.email||"Usuário";row.append(label);
+ const info=document.createElement("p");info.textContent=(data.email||"")+" · "+({pending:"Pendente",approved:"Autorizado",revoked:"Revogado"}[data.status]||"Desconhecido")+" · "+(data.role==="administrative"?"ADM":data.role==="resident"?"Condômino":"Sem perfil");row.append(info);
+ const unitSelect=document.createElement("select");unitSelect.setAttribute("aria-label","Apartamento");for(const u of ["",...units.filter(u=>u!=="204")]){const o=document.createElement("option");o.value=u;o.textContent=u?"AP "+u:"Selecionar apartamento";unitSelect.append(o)}unitSelect.value=data.unit||"";row.append(unitSelect);
+ const profile=document.createElement("select");profile.setAttribute("aria-label","Perfil");for(const [v,t] of [["resident","Condômino"],["administrative","ADM"]]){const o=document.createElement("option");o.value=v;o.textContent=t;profile.append(o)}profile.value=data.role==="administrative"?"administrative":"resident";row.append(profile);
+ function sync(){profile.options[1].disabled=!["101","201"].includes(unitSelect.value);if(profile.options[1].disabled)profile.value="resident"}unitSelect.onchange=sync;sync();
+ for(const [value,title] of [["approved",data.status==="approved"?"Salvar alterações":data.status==="revoked"?"Reativar acesso":"Autorizar acesso"],["revoked","Revogar acesso"]]){
+ const btn=document.createElement("button");btn.className="action";btn.style.width="auto";btn.textContent=title;btn.disabled=value==="revoked"&&data.status==="revoked";row.append(btn);
+ btn.onclick=async()=>{if(!row.isConnected||actor!==auth.currentUser?.uid||epoch!==generation)return;if(value==="approved"&&(!units.includes(unitSelect.value)||unitSelect.value==="204")){el("adminStatus").textContent="Selecione um apartamento válido.";return}if(!confirm(title+" para esta conta? Confirme a identidade e o vínculo com o condomínio."))return;btn.disabled=true;try{const fresh=await getDocFromServer(item.ref);if(!row.isConnected||actor!==auth.currentUser?.uid||epoch!==generation)return;if(!fresh.exists()||fresh.data().status!==data.status||fresh.data().unit!==data.unit||fresh.data().role!==data.role)throw Error("Conta alterada");await updateDoc(item.ref,value==="approved"?{status:value,unit:unitSelect.value,role:profile.value==="administrative"&&["101","201"].includes(unitSelect.value)?"administrative":"resident"}:{status:value});el("adminStatus").textContent="Permissão atualizada."}catch(e){el("adminStatus").textContent="Falha ao atualizar. Confira a conta e tente novamente.";btn.disabled=false}};
+ }results.append(row);
+ }if(!found)results.textContent="Nenhum usuário encontrado.";
+ }search.oninput=draw;filter.onchange=draw;draw();
 }
 el("financeLogout").onclick=()=>run(()=>signOut(auth));
 let financeKey="",financeTab="";
