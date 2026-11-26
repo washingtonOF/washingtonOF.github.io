@@ -18,7 +18,7 @@ el("logout").onclick=()=>run(()=>signOut(auth));
 let unsubscribe=null, generation=0;
 el("adminLogout").onclick=()=>run(()=>signOut(auth));
 const units=Array.from({length:6},(_,i)=>Array.from({length:i===5?2:4},(_,j)=>String((i+1)*100+j+1))).flat();
-function renderFinancial(container,name){
+function renderFinancial(container,name,issuer=null){
  container.replaceChildren();
  const toolbar=document.createElement("div");toolbar.className="dashboard-toolbar";const h=document.createElement("h3");h.textContent=name;toolbar.append(h);
  const period=document.createElement("input");period.type="month";const now=new Date();period.value=now.getFullYear()+"-"+String(now.getMonth()+1).padStart(2,"0");period.setAttribute("aria-label","Período de referência");toolbar.append(period);container.append(toolbar);
@@ -29,11 +29,12 @@ function renderFinancial(container,name){
  if(columns){const scroll=document.createElement("div");scroll.className="dashboard-scroll";const table=document.createElement("table");table.className="dashboard-table";const tr=table.createTHead().insertRow();for(const label of columns){const th=document.createElement("th");th.scope="col";th.textContent=label;tr.append(th)}scroll.append(table);container.append(scroll)}
  if(name==="Integração"){period.hidden=true;empty.textContent="Banco Cora: autenticação pendente. Nenhuma sincronização ativa."}
  container.append(empty);
+ if(issuer&&['Relatórios','Prestação de contas','Extratos','Extratos do condomínio','Meus boletos','Boletos'].includes(name)){const note=document.createElement('p');note.className='notice';note.textContent='Identificação prevista na emissão: AP '+issuer.unit+' · '+issuer.profile+'. Emissão indisponível até a integração financeira e validação do registro de auditoria.';container.append(note);}
 }
 function masterTab(tab){
  const extra=el("masterExtra");extra.replaceChildren();extra.hidden=tab==="accounts";el("userList").hidden=tab!=="accounts";
  document.querySelectorAll("[data-master]").forEach(b=>b.setAttribute("aria-selected",String(b.dataset.master===tab)));
- const financial={overview:"Visão geral",statement:"Extratos",income:"Receitas",expenses:"Despesas",invoices:"Boletos",reports:"Relatórios",settings:"Integração"};if(financial[tab])renderFinancial(extra,financial[tab]);
+ const financial={overview:"Visão geral",statement:"Extratos",income:"Receitas",expenses:"Despesas",invoices:"Boletos",reports:"Relatórios",settings:"Integração"};if(financial[tab])renderFinancial(extra,financial[tab],{unit:'204',profile:'Master'});
  if(tab==="units"){const grid=document.createElement("div");grid.className="unit-grid";for(const unit of units){const card=document.createElement("div");const title=document.createElement("strong");title.textContent="AP "+unit;const sub=document.createElement("small");const profile=unit==="204"?"Master":(["101","201"].includes(unit)?"Administrativo":"Condômino");sub.textContent=profile+" · vínculo a validar";card.style.borderTop="4px solid "+(unit==="204"?"#123d68":(["101","201"].includes(unit)?"#087b9d":"#528b70"));card.append(title,sub);grid.append(card)}extra.append(grid)}
  if(tab==="roles"){for(const [name,description] of [["Master — AP 204","Administração completa e auditoria. Exclusivo da conta Google Master."],["Administrativo / Síndico — AP 101 e 201","Gestão financeira e relatórios, após autorização individual."],["Condômino — demais 19 unidades","Consulta de informações autorizadas, sem edição."]]){const p=document.createElement("p");const strong=document.createElement("strong");strong.textContent=name+": ";p.append(strong,description);extra.append(p)}const note=document.createElement("p");note.className="notice";note.textContent="Atribuição de perfis disponível. Permissões financeiras ainda não habilitadas.";extra.append(note)}
  if(tab==="audit"){extra.textContent="Auditoria ainda não habilitada. Nenhum histórico de atividades está sendo exibido."}
@@ -68,7 +69,7 @@ function showFinance(data,user){
  el("financeIdentity").textContent="Apartamento "+data.unit+" · "+(user.email||"");
  const menus=administrative?["Visão geral","Extratos","Receitas","Despesas","Boletos","Relatórios","Cobranças"]:["Visão geral","Extratos do condomínio","Receitas e despesas","Meus boletos","Prestação de contas"];
  const menu=el("financeMenu");menu.replaceChildren();
- function select(name){financeTab=name;for(const b of menu.children)b.setAttribute("aria-selected",String(b.textContent===name));const content=el("financeContent");content.replaceChildren();renderFinancial(content,name);}
+ function select(name){financeTab=name;for(const b of menu.children)b.setAttribute("aria-selected",String(b.textContent===name));const content=el("financeContent");content.replaceChildren();renderFinancial(content,name,{unit:data.unit,profile:administrative?'Administrativo':'Condômino'});}
  for(const name of menus){const b=document.createElement("button");b.className="action";b.textContent=name;b.onclick=()=>select(name);menu.append(b)}
  select(menus[0]);document.querySelector(".shell").hidden=true;el("financePanel").hidden=false;
 }
