@@ -2,7 +2,7 @@
 import {initializeApp} from "https://www.gstatic.com/firebasejs/11.10.0/firebase-app.js";
 import {getAuth,GoogleAuthProvider,signInWithPopup,signInWithEmailAndPassword,createUserWithEmailAndPassword,sendEmailVerification,sendPasswordResetEmail,onAuthStateChanged,signOut} from "https://www.gstatic.com/firebasejs/11.10.0/firebase-auth.js";
 const app=initializeApp({apiKey:"AIzaSyAr7nCnvp__1lDlYgo9SHW02k34Ba7SGg4",authDomain:"vinnas-del-mar-finance.firebaseapp.com",projectId:"vinnas-del-mar-finance",storageBucket:"vinnas-del-mar-finance.firebasestorage.app",messagingSenderId:"445302387339",appId:"1:445302387339:web:0ad6fb7ea0757e5c025a8e"});
-import {getFirestore,doc,getDoc,setDoc,collection,onSnapshot,updateDoc} from "https://www.gstatic.com/firebasejs/11.10.0/firebase-firestore.js";
+import {getFirestore,doc,getDoc,setDoc,collection,onSnapshot,updateDoc,serverTimestamp,getDocFromServer} from "https://www.gstatic.com/firebasejs/11.10.0/firebase-firestore.js";
 const db=getFirestore(app);
 const auth=getAuth(app);auth.languageCode="pt-BR";
 const el=id=>document.getElementById(id),status=t=>el("status").textContent=t;
@@ -39,15 +39,22 @@ function renderFinancial(container,name,issuer=null){
  }
  if(issuer&&issuer.unit!=='204'&&['Relatórios','Prestação de contas','Extratos','Extratos do condomínio','Meus boletos','Boletos'].includes(name)){const note=document.createElement('p');note.className='notice';note.textContent='Emitido pelo apartamento: '+issuer.unit+'. Emissão indisponível até a integração financeira e validação do registro de auditoria.';container.append(note);}
 }
-function residentPreview(container,unit){
+async function residentPreview(container,unit,role='master'){
  const old=container.querySelector('.resident-preview');if(old)old.remove();
- const panel=document.createElement('section');panel.className='resident-preview finance-content';panel.style.marginTop='18px';
+ const panel=document.createElement('section');panel.className='resident-preview finance-content';panel.style.marginTop='18px';container.append(panel);
  const h=document.createElement('h3');h.textContent='Ficha cadastral — AP '+unit;panel.append(h);
- const notice=document.createElement('p');notice.className='notice';notice.textContent='Prévia cadastral. Edição e armazenamento bloqueados até a publicação das regras de acesso e auditoria.';panel.append(notice);
- const fields=[['Nome do proprietário','text'],['Responsável pela unidade','text'],['CPF','text'],['Telefone / WhatsApp','tel'],['E-mail','email'],['Quantidade de moradores','number'],['Início da ocupação','date']];
- for(const [label,type] of fields){const wrap=document.createElement('label');wrap.style.cssText='display:block;margin-top:12px';wrap.append(label);const input=document.createElement('input');input.type=type;input.disabled=true;input.style.cssText='display:block;width:100%;padding:10px;border:1px solid #cbd9e7;border-radius:8px;margin-top:4px';wrap.append(input);panel.append(wrap)}
- const label=document.createElement('label');label.textContent='Tipo de ocupação';label.style.display='block';const select=document.createElement('select');select.disabled=true;for(const name of ['Não informado','Proprietário residente','Inquilino','Cedido','Desocupado']){const option=document.createElement('option');option.textContent=name;select.append(option)}label.append(select);panel.append(label);
- const save=document.createElement('button');save.className='action primary';save.disabled=true;save.textContent='Salvar alterações';panel.append(save);container.append(panel);
+ const notice=document.createElement('p');notice.className='notice';notice.textContent='Consultando cadastro protegido…';panel.append(notice);
+ const ref=doc(db,'residents',unit);const actor=auth.currentUser;const epoch=generation;
+ try{
+ const snapshot=await getDocFromServer(ref);if(!panel.isConnected||epoch!==generation)return;
+ const data=snapshot.data()||{};const form=document.createElement('form');const inputs={};
+ const fields=[['owner','Nome do proprietário','text',150],['responsible','Responsável pela unidade','text',150],['cpf','CPF','text',14],['phone','Telefone / WhatsApp','tel',30],['email','E-mail','email',254],['count','Quantidade de moradores','number',3],['start','Início da ocupação','date',10]];
+ for(const [key,label,type,max] of fields){const wrap=document.createElement('label');wrap.style.cssText='display:block;margin-top:12px';wrap.append(label);const input=document.createElement('input');input.type=type;input.maxLength=max;input.value=data[key]??(key==='count'?0:'');if(key==='count'){input.min=0;input.max=100;input.step=1;input.required=true}input.disabled=role==='resident'?key!=='phone':role==='administrative'&&key==='owner';input.style.cssText='display:block;width:100%;padding:10px;border:1px solid #cbd9e7;border-radius:8px;margin-top:4px';inputs[key]=input;wrap.append(input);form.append(wrap)}
+ const label=document.createElement('label');label.textContent='Tipo de ocupação';label.style.display='block';const select=document.createElement('select');select.disabled=role==='resident';for(const name of ['Não informado','Proprietário residente','Inquilino','Cedido','Desocupado']){const option=document.createElement('option');option.textContent=name;select.append(option)}select.value=data.occupation||'Não informado';inputs.occupation=select;label.append(select);form.append(label);
+ const save=document.createElement('button');save.className='action primary';save.type='submit';save.textContent='Salvar alterações';save.disabled=!snapshot.exists()&&role!=='master';form.append(save);panel.append(form);
+ notice.textContent=save.disabled?'Cadastro inicial deve ser criado pelo Master.':'Dados protegidos. Confira antes de salvar.';
+ form.onsubmit=async e=>{e.preventDefault();if(epoch!==generation||auth.currentUser?.uid!==actor?.uid)return;save.disabled=true;try{const payload={updatedBy:actor.uid,updatedAt:serverTimestamp()};for(const [key,input] of Object.entries(inputs)){if(!input.disabled)payload[key]=key==='count'?Number(input.value):input.value.trim()}if(snapshot.exists())await updateDoc(ref,payload);else await setDoc(ref,payload);notice.textContent='Cadastro salvo.'; }catch(e){notice.textContent='Não foi possível salvar. Verifique as permissões e tente novamente.';}finally{save.disabled=false}};
+ }catch(e){notice.textContent='Cadastro indisponível. Regras de acesso ainda não publicadas ou acesso não autorizado.';}
 }
 function masterTab(tab){
  const extra=el("masterExtra");extra.replaceChildren();extra.hidden=tab==="accounts";el("userList").hidden=tab!=="accounts";
@@ -85,9 +92,9 @@ function showFinance(data,user){
  financeKey=key;el("financeProfile").textContent=administrative?"ÁREA ADMINISTRATIVA":"ÁREA DO CONDÔMINO";
  el("financeTitle").textContent=administrative?"Central administrativa":"Portal do condômino";
  el("financeIdentity").textContent="Apartamento "+data.unit+" · "+(user.email||"");
- const menus=administrative?["Visão geral","Extratos","Receitas","Despesas","Boletos","Relatórios","Cobranças"]:["Visão geral","Extratos do condomínio","Receitas e despesas","Meus boletos","Prestação de contas"];
+ const menus=administrative?["Visão geral","Extratos","Receitas","Despesas","Boletos","Relatórios","Cobranças","Cadastros"]:["Visão geral","Extratos do condomínio","Receitas e despesas","Meus boletos","Prestação de contas","Meu cadastro"];
  const menu=el("financeMenu");menu.replaceChildren();
- function select(name){financeTab=name;for(const b of menu.children)b.setAttribute("aria-selected",String(b.textContent===name));const content=el("financeContent");content.replaceChildren();renderFinancial(content,name,{unit:data.unit,profile:administrative?'Administrativo':'Condômino'});}
+ function select(name){financeTab=name;for(const b of menu.children)b.setAttribute("aria-selected",String(b.textContent===name));const content=el("financeContent");content.replaceChildren();if(name==='Meu cadastro'){residentPreview(content,data.unit,'resident');return;}if(name==='Cadastros'){const picker=document.createElement('select');picker.setAttribute('aria-label','Apartamento');for(const u of units){const o=document.createElement('option');o.value=u;o.textContent='AP '+u;picker.append(o)}content.append(picker);picker.onchange=()=>residentPreview(content,picker.value,'administrative');picker.onchange();return;}renderFinancial(content,name,{unit:data.unit,profile:administrative?'Administrativo':'Condômino'});}
  for(const name of menus){const b=document.createElement("button");b.className="action";b.textContent=name;b.onclick=()=>select(name);menu.append(b)}
  select(menus[0]);document.querySelector(".shell").hidden=true;el("financePanel").hidden=false;
 }
