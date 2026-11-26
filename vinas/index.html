@@ -120,9 +120,23 @@ function showUsers(snapshot){
  const list=el("userList");const previous=list.querySelector('input')?.value||"";const previousFilter=list.querySelector('select')?.value||"all";list.replaceChildren();
  const h=document.createElement("h2");h.textContent="Gestão de usuários e acessos";list.append(h);
  const note=document.createElement("p");note.textContent="Autorize contas verificadas, associe apartamentos e gerencie perfis. AP 204 é exclusivo do Master; ADM somente AP 101 e 201.";list.append(note);
- const search=document.createElement("input");search.placeholder="Pesquisar nome, e-mail ou apartamento";search.value=previous;search.setAttribute("aria-label","Pesquisar usuários");list.append(search);
+ const search=document.createElement("input");search.placeholder="Pesquisar nome, e-mail ou apartamento";search.value=previous;search.setAttribute("aria-label","Pesquisar usuários");search.style.cssText="padding:10px;border:1px solid #cbd9e7;border-radius:8px;width:min(100%,360px);margin:8px 8px 8px 0";list.append(search);
  const filter=document.createElement("select");filter.setAttribute("aria-label","Situação do acesso");for(const [v,t] of [["all","Todos"],["pending","Pendentes"],["approved","Autorizados"],["revoked","Revogados"]]){const o=document.createElement("option");o.value=v;o.textContent=t;filter.append(o)}filter.value=previousFilter;list.append(filter);
  const results=document.createElement("div");list.append(results);
+ const registry=document.createElement("section");registry.style.marginTop="18px";list.append(registry);
+ const registryTitle=document.createElement("h3");registryTitle.textContent="Acessos por apartamento";registry.append(registryTitle);
+ const registryRows=document.createElement("div");registry.append(registryRows);
+ const registryActor=auth.currentUser?.uid,registryEpoch=generation;
+ Promise.all([getDocsFromServer(collection(db,"residents")),getDocsFromServer(collection(db,"unit_access_preferences")).catch(()=>null)]).then(([residents,prefs])=>{
+ if(!registry.isConnected||registryActor!==auth.currentUser?.uid||registryEpoch!==generation)return;
+ const names=new Map(residents.docs.map(d=>[d.id,d.data()])), preferences=new Map((prefs?.docs||[]).map(d=>[d.id,d.data().role]));
+ for(const unit of units){const data=names.get(unit)||{},accounts=snapshot.docs.filter(d=>d.data().unit===unit);const row=document.createElement("div");row.style.cssText="display:flex;flex-wrap:wrap;align-items:center;gap:12px;padding:12px;border-bottom:1px solid #dbe5ef";
+ const label=document.createElement("div");label.style.flex="1";const title=document.createElement("strong");title.textContent="AP "+unit+" — "+(data.responsible||data.owner||"Sem cadastro");const status=document.createElement("p");status.style.margin="4px 0";status.textContent=unit==="204"?"Master — sessão ativa":accounts.some(d=>d.data().status==="approved")?"Acesso autorizado":accounts.some(d=>d.data().status==="revoked")?"Acesso revogado":accounts.length?"Aguardando autorização":"Aguardando criação e associação de conta";label.append(title,status);row.append(label);
+ if(unit!=="204"){const select=document.createElement("select");select.setAttribute("aria-label","Perfil pretendido AP "+unit);for(const [v,t] of [["resident","Condômino"],["administrative","ADM"]]){const o=document.createElement("option");o.value=v;o.textContent=t;o.disabled=v==="administrative"&&!["101","201"].includes(unit);select.append(o)}select.value=preferences.get(unit)||"resident";row.append(select);const save=document.createElement("button");save.className="action";save.style.width="auto";save.textContent="Salvar perfil previsto";save.disabled=!prefs;row.append(save);save.onclick=async()=>{if(!row.isConnected||registryActor!==auth.currentUser?.uid||registryEpoch!==generation)return;save.disabled=true;try{await setDoc(doc(db,"unit_access_preferences",unit),{role:select.value,updatedBy:registryActor,updatedAt:serverTimestamp()});status.textContent="Perfil previsto salvo — não concede acesso.";}catch(e){status.textContent="Não foi possível salvar o perfil previsto."}finally{save.disabled=false}};}
+ registryRows.append(row);
+ }if(!prefs){const warning=document.createElement("p");warning.textContent="Publique as regras atualizadas do Firebase para salvar perfis previstos.";registry.append(warning)}
+ }).catch(()=>{registryRows.textContent="Não foi possível consultar os cadastros das unidades."});
+
  const actor=auth.currentUser?.uid,epoch=generation;
  function draw(){results.replaceChildren();const q=search.value.trim().toLowerCase();let found=0;
  for(const item of snapshot.docs){const data=item.data();if(filter.value!=="all"&&data.status!==filter.value)continue;if(q&&![data.name,data.email,data.unit].some(v=>String(v||"").toLowerCase().includes(q)))continue;found++;
