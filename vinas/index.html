@@ -142,7 +142,13 @@ function showUsers(snapshot){
     const decisionRef=doc(db,"registration_decisions",record.id);
     const decision=await getDocFromServer(decisionRef);
     if(!review.isConnected||actor!==auth.currentUser?.uid||epoch!==generation)return;
-    if(decision.exists()){row.append(document.createTextNode(" · Decisão registrada: "+(decision.data().decision==="approved"?"Aprovada":"Recusada")));continue;}
+    if(decision.exists()){
+     const d=decision.data();row.append(document.createTextNode(" · Decisão registrada: "+(d.decision==="approved"?"Aprovada":"Recusada")));
+     if(d.decision==="approved"&&account.status==="pending"&&units.includes(d.unit)&&d.unit!=="204"){
+      const grant=document.createElement("button");grant.type="button";grant.textContent="Liberar acesso como condômino";row.append(grant);
+      grant.onclick=async()=>{if(!review.isConnected||actor!==auth.currentUser?.uid||epoch!==generation)return;if(!confirm("Liberar acesso ao apartamento "+d.unit+" como condômino?"))return;grant.disabled=true;try{const target=doc(db,"users",record.id);const fresh=await getDocFromServer(target);if(!review.isConnected||actor!==auth.currentUser?.uid||epoch!==generation)return;if(!fresh.exists()||fresh.data().status!=="pending")throw Error("state changed");await updateDoc(target,{unit:d.unit,role:"resident",status:"approved"});if(review.isConnected&&actor===auth.currentUser?.uid&&epoch===generation)grant.textContent="Acesso liberado";}catch(e){if(review.isConnected&&actor===auth.currentUser?.uid&&epoch===generation){grant.disabled=false;alert("Não foi possível liberar o acesso.");}}};
+     }continue;
+    }
     for(const [value,title] of [["approved","Confirmar identidade e aprovar solicitação"],["rejected","Recusar solicitação"]]){
      if(value==="approved"&&(result.status!=="matched"||!result.unit||result.unit==="204"||account.status!=="pending"))continue;
      const button=document.createElement("button");button.type="button";button.textContent=title;row.append(button);
