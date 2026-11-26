@@ -29,6 +29,13 @@ function renderFinancial(container,name,issuer=null){
  if(columns){const scroll=document.createElement("div");scroll.className="dashboard-scroll";const table=document.createElement("table");table.className="dashboard-table";const tr=table.createTHead().insertRow();for(const label of columns){const th=document.createElement("th");th.scope="col";th.textContent=label;tr.append(th)}scroll.append(table);container.append(scroll)}
  if(name==="Integração"){period.hidden=true;empty.textContent="Banco Cora: autenticação pendente. Nenhuma sincronização ativa."}
  container.append(empty);
+ if(issuer&&['Relatórios','Prestação de contas','Extratos','Extratos do condomínio','Receitas','Despesas','Receitas e despesas','Boletos','Meus boletos'].includes(name)){
+ const controls=document.createElement('div');controls.style.cssText='display:flex;gap:10px;flex-wrap:wrap;margin-top:16px';
+ if(name==='Relatórios'){const select=document.createElement('select');select.setAttribute('aria-label','Tipo de relatório');for(const label of ['Extrato financeiro','Receitas','Despesas','Boletos pagos','Boletos em aberto','Inadimplência','Balancete mensal','Prestação de contas']){const opt=document.createElement('option');opt.textContent=label;select.append(opt)}controls.append(select)}
+ const formats=issuer.profile==='Condômino'?['Gerar PDF']:['Exportar Excel (.xlsx)','Gerar PDF','Imprimir'];
+ for(const label of formats){const b=document.createElement('button');b.className='action';b.style.cssText='width:auto;opacity:.55;cursor:not-allowed';b.textContent=label;b.disabled=true;b.title='Disponível após integração financeira e validação da auditoria';controls.append(b)}
+ container.append(controls);
+ }
  if(issuer&&issuer.unit!=='204'&&['Relatórios','Prestação de contas','Extratos','Extratos do condomínio','Meus boletos','Boletos'].includes(name)){const note=document.createElement('p');note.className='notice';note.textContent='Emitido pelo apartamento: '+issuer.unit+'. Emissão indisponível até a integração financeira e validação do registro de auditoria.';container.append(note);}
 }
 function masterTab(tab){
