@@ -139,6 +139,15 @@ function showUsers(snapshot){
     const row=document.createElement("p");row.style.cssText="padding:12px;border-bottom:1px solid #dbe5ef";
     const label={matched:"CPF correspondente — verificar identidade",review:"Revisão manual necessária",invalid:"CPF inválido",not_found:"Cadastro não localizado"}[result.status]||"Resultado desconhecido";
     row.textContent=[account.email||"Conta não localizada",result.masked_name||"",result.unit?"AP "+result.unit:"",label].filter(Boolean).join(" · ");reviewRows.append(row);
+    const decisionRef=doc(db,"registration_decisions",record.id);
+    const decision=await getDocFromServer(decisionRef);
+    if(!review.isConnected||actor!==auth.currentUser?.uid||epoch!==generation)return;
+    if(decision.exists()){row.append(document.createTextNode(" · Decisão registrada: "+(decision.data().decision==="approved"?"Aprovada":"Recusada")));continue;}
+    for(const [value,title] of [["approved","Confirmar identidade e aprovar solicitação"],["rejected","Recusar solicitação"]]){
+     if(value==="approved"&&(result.status!=="matched"||!result.unit||result.unit==="204"||account.status!=="pending"))continue;
+     const button=document.createElement("button");button.type="button";button.textContent=title;row.append(button);
+     button.onclick=async()=>{if(!review.isConnected||actor!==auth.currentUser?.uid||epoch!==generation)return;if(!confirm(value==="approved"?"Confirma que verificou a identidade por um canal independente? Esta decisão não libera acesso automaticamente.":"Confirma a recusa da solicitação?"))return;button.disabled=true;try{await setDoc(decisionRef,{decision:value,unit:value==="approved"?result.unit:"",decidedBy:actor,decidedAt:serverTimestamp()});if(review.isConnected&&actor===auth.currentUser?.uid&&epoch===generation)reviewButton.click();}catch(e){if(review.isConnected&&actor===auth.currentUser?.uid&&epoch===generation){button.disabled=false;alert("Não foi possível registrar a decisão.");}}};
+    }
    }
   }catch(e){if(review.isConnected&&actor===auth.currentUser?.uid&&epoch===generation)reviewRows.textContent="Consulta indisponível. A integração cadastral ainda pode estar pendente.";}
   finally{reviewButton.disabled=false;}
