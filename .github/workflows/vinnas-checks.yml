@@ -24,3 +24,16 @@ jobs:
         run: node --input-type=module --check < vinas/portal-security-v1.js
       - name: Run portal regression checks
         run: node vinas/tests/portal-checks.mjs
+      - name: Build minified candidate
+        run: |
+          mkdir -p build-vinnas
+          npx --yes esbuild@0.25.12 vinas/portal-security-v1.js --minify --format=esm --target=es2022 --outfile=build-vinnas/portal-security-v1.min.js
+          node --input-type=module --check < build-vinnas/portal-security-v1.min.js
+          wc -c vinas/portal-security-v1.js build-vinnas/portal-security-v1.min.js
+          gzip -c vinas/portal-security-v1.js | wc -c
+          gzip -c build-vinnas/portal-security-v1.min.js | wc -c
+      - uses: actions/upload-artifact@v4
+        with:
+          name: vinnas-minified-candidate
+          path: build-vinnas/portal-security-v1.min.js
+          retention-days: 7
