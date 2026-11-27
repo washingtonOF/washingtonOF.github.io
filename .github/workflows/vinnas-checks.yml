@@ -22,6 +22,8 @@ jobs:
           node-version: '22'
       - name: Check JavaScript module syntax
         run: node --input-type=module --check < vinas/portal-security-v1.js
+      - name: Check lazy modules
+        run: for file in vinas/modules/*.mjs; do node --check "$file" || exit 1; done
       - name: Run portal regression checks
         run: node vinas/tests/portal-checks.mjs
       - name: Build minified candidate
