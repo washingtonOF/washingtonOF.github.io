@@ -27,10 +27,7 @@ assert.equal(new Set(ids).size,ids.length,'duplicate HTML IDs');
 for(const menu of ['audit','backup','documents','intelligence'])assert.equal([...html.matchAll(/data-master="([^"]+)"/g)].filter(m=>m[1]===menu).length,1,menu);
 console.log('PASS HTML IDs, menus and repeated identifiers');
 
-const cryptoStart=js.indexOf('async function encryptPortalBackup(');
-const cryptoEnd=js.indexOf('function renderBackup(',cryptoStart);
-assert.ok(cryptoStart>=0&&cryptoEnd>cryptoStart);
-const encrypt=vm.runInNewContext(js.slice(cryptoStart,cryptoEnd)+';encryptPortalBackup',{crypto:globalThis.crypto,TextEncoder,Uint8Array,btoa});
+const {encryptPortalBackup:encrypt}=await import('../modules/export-tools.mjs');
 const password='test-only-long-password';
 const payload={records:[{path:'demo/one',data:{value:123}}]};
 const encrypted=await encrypt(payload,password);
