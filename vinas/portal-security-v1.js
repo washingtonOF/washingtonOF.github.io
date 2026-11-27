@@ -39,7 +39,7 @@ function renderFinancial(container,name,issuer=null){
  if(issuer&&['Relatórios','Prestação de contas','Extratos','Extratos do condomínio','Receitas','Despesas','Receitas e despesas','Boletos','Meus boletos'].includes(name)){
  const controls=document.createElement('div');controls.style.cssText='display:flex;gap:10px;flex-wrap:wrap;margin-top:16px';
  if(name==='Relatórios'){const select=document.createElement('select');select.setAttribute('aria-label','Tipo de relatório');for(const label of ['Extrato financeiro','Receitas','Despesas','Boletos pagos','Boletos em aberto','Inadimplência','Balancete mensal','Prestação de contas']){const opt=document.createElement('option');opt.textContent=label;select.append(opt)}controls.append(select)}
- const formats=issuer.profile==='Condômino'?['Gerar PDF']:['Exportar Excel (.xlsx)','Gerar PDF','Imprimir'];
+ const formats=issuer.profile==='Condômino'?[]:['Exportar Excel (.xlsx)','Gerar PDF','Imprimir'];
  for(const label of formats){const b=document.createElement('button');b.className='action';b.style.cssText='width:auto;opacity:.55;cursor:not-allowed';b.textContent=label;b.disabled=true;b.title='Disponível após integração financeira e validação da auditoria';controls.append(b)}
  container.append(controls);
  }
@@ -205,7 +205,7 @@ if(data.status==="pending")row.append(pendingDeleteButton(item.id,data.email));r
 }
 el("financeLogout").onclick=()=>run(()=>signOut(auth));
 let financeKey="",financeTab="";
-function hideFinance(){financeKey="";financeTab="";el("financePanel").hidden=true;el("financeMenu").replaceChildren();el("financeContent").replaceChildren();el("financeIdentity").textContent="";}
+function hideFinance(){document.body.classList.remove("resident-print-restricted");financeKey="";financeTab="";el("financePanel").hidden=true;el("financeMenu").replaceChildren();el("financeContent").replaceChildren();el("financeIdentity").textContent="";}
 function showFinance(data,user){
  const administrative=data.role==="administrative",key=user.uid+":"+data.unit+":"+data.role;
  if(financeKey===key&&!el("financePanel").hidden)return;
@@ -226,7 +226,7 @@ function showFinance(data,user){
 
  const menus=administrative?["Visão geral","Extratos","Receitas","Despesas","Boletos","Relatórios","Cobranças","Cadastros","Cadastros Cora"]:["Extratos do condomínio","Meus boletos","Prestação de contas","Meu cadastro"];
  const menu=el("financeMenu");menu.replaceChildren();
- function select(name){financeTab=name;for(const b of menu.children)b.setAttribute("aria-selected",String(b.textContent===name));const content=el("financeContent");content.replaceChildren();if(name==='Cadastros Cora'&&administrative){coraRegistry(content);return;}if(name==='Meu cadastro'){residentPreview(content,data.unit,'resident');return;}if(name==='Cadastros'){const picker=document.createElement('select');picker.setAttribute('aria-label','Apartamento');for(const u of units){const o=document.createElement('option');o.value=u;o.textContent='AP '+u;picker.append(o)}content.append(picker);picker.onchange=()=>residentPreview(content,picker.value,'administrative');picker.onchange();return;}renderFinancial(content,name,{unit:data.unit,profile:administrative?'Administrativo':'Condômino'});}
+ function select(name){financeTab=name;document.body.classList.toggle("resident-print-restricted",!administrative&&name!=="Meu cadastro");for(const b of menu.children)b.setAttribute("aria-selected",String(b.textContent===name));const content=el("financeContent");content.replaceChildren();if(name==='Cadastros Cora'&&administrative){coraRegistry(content);return;}if(name==='Meu cadastro'){residentPreview(content,data.unit,'resident');return;}if(name==='Cadastros'){const picker=document.createElement('select');picker.setAttribute('aria-label','Apartamento');for(const u of units){const o=document.createElement('option');o.value=u;o.textContent='AP '+u;picker.append(o)}content.append(picker);picker.onchange=()=>residentPreview(content,picker.value,'administrative');picker.onchange();return;}renderFinancial(content,name,{unit:data.unit,profile:administrative?'Administrativo':'Condômino'});}
  for(const name of menus){const b=document.createElement("button");b.className="action";b.textContent=name;b.onclick=()=>select(name);menu.append(b)}
  select(menus[0]);document.querySelector(".shell").hidden=true;el("financePanel").hidden=false;
 }
@@ -264,3 +264,5 @@ onAuthStateChanged(auth,async user=>{
 
 const identityLogo=document.querySelector(".identity img");
 if(identityLogo){const fallback=()=>{if(!identityLogo.src.endsWith("/vinnas-logo.jpg"))identityLogo.src="vinnas-logo.jpg";};identityLogo.addEventListener("error",fallback,{once:true});if(identityLogo.complete&&!identityLogo.naturalWidth)fallback();}
+
+document.addEventListener("keydown",event=>{if(document.body.classList.contains("resident-print-restricted")&&(event.ctrlKey||event.metaKey)&&event.key.toLowerCase()==="p"){event.preventDefault();window.alert("A impressão e a exportação desta área não estão disponíveis para condôminos.");}});
