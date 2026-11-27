@@ -212,7 +212,19 @@ function showFinance(data,user){
  financeKey=key;el("financeProfile").textContent=administrative?"ÁREA ADMINISTRATIVA":"ÁREA DO CONDÔMINO";
  el("financeTitle").textContent=administrative?"Central administrativa":"Portal do condômino";
  el("financeIdentity").textContent="Apartamento "+data.unit+" · "+(user.email||"");
- const menus=administrative?["Visão geral","Extratos","Receitas","Despesas","Boletos","Relatórios","Cobranças","Cadastros","Cadastros Cora"]:["Visão geral","Extratos do condomínio","Receitas e despesas","Meus boletos","Prestação de contas","Meu cadastro"];
+ const panel=el("financePanel"),title=el("financeTitle"),profile=el("financeProfile"),identity=el("financeIdentity");
+ panel.querySelector(".master-stats").style.display=administrative?"":"none";
+ panel.querySelector("#residentBrand")?.remove();
+ title.style.fontSize=administrative?"":"20px";
+ profile.style.display=administrative?"":"none";
+ if(!administrative){
+  title.textContent="Apartamento "+data.unit;
+  identity.textContent=user.email||"";
+  const brand=document.createElement("img");brand.id="residentBrand";brand.src="vinnas-logo.webp";brand.alt="Condomínio Vinnas Del Mar";brand.style.cssText="width:110px;height:auto;float:right;margin:0 0 12px 16px";brand.addEventListener("error",()=>{brand.src="vinnas-logo.jpg";},{once:true});panel.prepend(brand);
+  getDocFromServer(doc(db,"residents",data.unit)).then(snapshot=>{if(financeKey!==key||auth.currentUser?.uid!==user.uid||el("financePanel").hidden)return;const record=snapshot.data()||{};const name=String(record.responsible||record.owner||"").replace(/^\s*\d+\s*[-–]\s*/,"").trim();if(name)title.textContent=name;identity.textContent="Apartamento "+data.unit+" · "+(user.email||"");}).catch(()=>{});
+ }
+
+ const menus=administrative?["Visão geral","Extratos","Receitas","Despesas","Boletos","Relatórios","Cobranças","Cadastros","Cadastros Cora"]:["Extratos do condomínio","Meus boletos","Prestação de contas","Meu cadastro"];
  const menu=el("financeMenu");menu.replaceChildren();
  function select(name){financeTab=name;for(const b of menu.children)b.setAttribute("aria-selected",String(b.textContent===name));const content=el("financeContent");content.replaceChildren();if(name==='Cadastros Cora'&&administrative){coraRegistry(content);return;}if(name==='Meu cadastro'){residentPreview(content,data.unit,'resident');return;}if(name==='Cadastros'){const picker=document.createElement('select');picker.setAttribute('aria-label','Apartamento');for(const u of units){const o=document.createElement('option');o.value=u;o.textContent='AP '+u;picker.append(o)}content.append(picker);picker.onchange=()=>residentPreview(content,picker.value,'administrative');picker.onchange();return;}renderFinancial(content,name,{unit:data.unit,profile:administrative?'Administrativo':'Condômino'});}
  for(const name of menus){const b=document.createElement("button");b.className="action";b.textContent=name;b.onclick=()=>select(name);menu.append(b)}
