@@ -58,7 +58,7 @@ function renderFinancial(container,name,issuer=null){
  if(name==="Extratos"&&["Master","Administrativo"].includes(issuer?.profile)){
  const actor=auth.currentUser?.uid,epoch=generation;empty.textContent="Carregando extratos…";
  const active=()=>actor&&actor===auth.currentUser?.uid&&epoch===generation&&container.contains(empty)&&container.contains(toolbar);
- import("./modules/statement.mjs?v=1").then(m=>{if(active())m.renderStatement(container,issuer,{toolbar,period,empty,auth,db,getDocFromServer,doc,inspectStatement,downloadStatementXlsx,generation:()=>generation});}).catch(()=>{if(active())empty.textContent="Não foi possível carregar os extratos. Abra a opção novamente.";});
+ import("./modules/statement.mjs?v=2").then(m=>{if(active())m.renderStatement(container,issuer,{toolbar,period,empty,auth,db,getDocFromServer,doc,inspectStatement,downloadStatementXlsx,generation:()=>generation});}).catch(()=>{if(active())empty.textContent="Não foi possível carregar os extratos. Abra a opção novamente.";});
  }
  if(name==="Integração"){period.hidden=true;empty.textContent="Banco Cora: autenticação pendente. Nenhuma sincronização ativa."}
  container.append(empty);
