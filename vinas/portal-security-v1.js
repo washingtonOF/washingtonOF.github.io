@@ -24,7 +24,34 @@ el("logout").onclick=()=>run(()=>signOut(auth));
 let unsubscribe=null, generation=0;
 el("adminLogout").onclick=()=>run(()=>signOut(auth));
 const units=Array.from({length:6},(_,i)=>Array.from({length:i===5?2:4},(_,j)=>String((i+1)*100+j+1))).flat();
+async function residentBills(container,issuer){
+ container.replaceChildren();
+ const h=document.createElement("h3");h.textContent="Meus boletos";container.append(h);
+ const period=document.createElement("input");period.type="month";const now=new Date();period.value=now.getFullYear()+"-"+String(now.getMonth()+1).padStart(2,"0");period.setAttribute("aria-label","Mês de referência");container.append(period);
+ const list=document.createElement("div");container.append(list);
+ const actor=auth.currentUser?.uid,epoch=generation;let version=0;
+ const active=()=>container.isConnected&&actor===auth.currentUser?.uid&&epoch===generation;
+ const copyButton=(label,value)=>{const b=document.createElement("button");b.className="action";b.textContent=label;b.onclick=async()=>{if(!active())return;try{await navigator.clipboard.writeText(value);b.textContent="Código copiado";}catch{b.textContent="Não foi possível copiar";}};return b;};
+ async function refresh(){const v=++version;list.textContent="Consultando boletos…";try{
+ const snap=await getDocFromServer(doc(db,"finance_units",issuer.unit,"months",period.value));
+ if(!active()||v!==version)return;
+ const data=snap.data();list.replaceChildren();
+ if(!data||data.paymentSchema!==1||data.authorizedUid!==actor||!Array.isArray(data.invoices)){list.textContent="Boletos individuais ainda indisponíveis para este período.";return;}
+ if(!data.invoices.length){list.textContent="Nenhum boleto neste período.";return;}
+ for(const bill of data.invoices){if(!bill||typeof bill!=="object")continue;
+ const item=document.createElement("section");item.style.cssText="padding:16px 0;border-bottom:1px solid #dce5ef";
+ const title=document.createElement("strong");title.textContent="Boleto · "+String(bill.dueDate||"Vencimento não informado");
+ const info=document.createElement("p");const labels={paid:"Pago",pending:"Em aberto",overdue:"Vencido",cancelled:"Cancelado"};info.textContent=(labels[bill.status]||"Situação não confirmada")+(Number.isSafeInteger(bill.amountCents)&&bill.amountCents>=0?" · "+(bill.amountCents/100).toLocaleString("pt-BR",{style:"currency",currency:"BRL"}):"");item.append(title,info);
+ if(["pending","overdue"].includes(bill.status)&&data.paymentEnabled===true){
+ const pix=typeof bill.pixCode==="string"&&bill.pixCode.length<=1024&&bill.pixCode.startsWith("000201")?bill.pixCode:"";
+ const line=typeof bill.digitableLine==="string"&&/^\d{47}$/.test(bill.digitableLine)?bill.digitableLine:"";
+ if(pix||line){const pay=document.createElement("button");pay.className="action primary";pay.textContent="Pague agora";const details=document.createElement("div");details.hidden=true;pay.onclick=()=>{details.hidden=!details.hidden;pay.textContent=details.hidden?"Pague agora":"Fechar pagamento";};const note=document.createElement("p");note.textContent="Confira o beneficiário e o valor no seu banco antes de confirmar.";details.append(note);for(const [label,value] of [["Pix Copia e Cola",pix],["Linha digitável",line]]){if(!value)continue;const p=document.createElement("p");p.textContent=label;const field=document.createElement("textarea");field.readOnly=true;field.value=value;field.setAttribute("aria-label",label);details.append(p,field,copyButton("Copiar "+label,value));}item.append(pay,details);}
+ }list.append(item);}
+ }catch{if(active()&&v===version)list.textContent="Não foi possível consultar os boletos com segurança.";}}
+ period.onchange=refresh;refresh();
+}
 function renderFinancial(container,name,issuer=null){
+ if(name==="Meus boletos"&&issuer?.profile==="Condômino"){residentBills(container,issuer);return;}
  container.replaceChildren();
  const toolbar=document.createElement("div");toolbar.className="dashboard-toolbar";const h=document.createElement("h3");h.textContent=name;toolbar.append(h);
  const period=document.createElement("input");period.type="month";const now=new Date();period.value=now.getFullYear()+"-"+String(now.getMonth()+1).padStart(2,"0");period.setAttribute("aria-label","Período de referência");toolbar.append(period);container.append(toolbar);
